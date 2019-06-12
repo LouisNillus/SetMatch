@@ -40,6 +40,7 @@ namespace NS_Rank
         //List of rank Lists
         public List<List<Player>> listOfRankList = new List<List<Player>>();
 
+        Player myPlayer;
         Player opponent;
 
         public InputField inputRankA;
@@ -108,6 +109,11 @@ namespace NS_Rank
             Debug.Log("A: " + Time.time);
             createPlayers(playersInit);
             Debug.Log("B: " + Time.time);
+
+            //Initialisation du joueur A
+            myPlayer = listOfRankList[0][0];
+            myPlayer.pseudo = "Louis";
+            myPlayer.isOnline = true;
         }
 
         // Update
@@ -155,7 +161,7 @@ namespace NS_Rank
                 }
             }
             //////////////////////////////
-            opponent = GetNewOpponent(valueRankA);
+            opponent = GetNewOpponentFor(myPlayer);
         }
 
 
@@ -267,7 +273,7 @@ namespace NS_Rank
             canBake = true;
         }
 
-        public Player GetNewOpponent(float thisPlayerELO)
+        public Player GetNewOpponentFor(Player playerA)
         {
             Player opponent;
             float findOpponentOfElo = 0f;
@@ -275,17 +281,17 @@ namespace NS_Rank
             switch (opponentDifficulty)
             {
                 case OpponentDifficulty.Easier:
-                    findOpponentOfElo = Random.Range(thisPlayerELO - equivalentRange - easierRange, thisPlayerELO - equivalentRange);
+                    findOpponentOfElo = Random.Range(playerA.ELO - equivalentRange - easierRange, playerA.ELO - equivalentRange);
                     //Debug.Log(findOpponentOfElo);
                     break;
 
                 case OpponentDifficulty.Equivalent:
-                    findOpponentOfElo = Random.Range(thisPlayerELO - equivalentRange, thisPlayerELO + equivalentRange);
+                    findOpponentOfElo = Random.Range(playerA.ELO - equivalentRange, playerA.ELO + equivalentRange);
                     //Debug.Log(findOpponentOfElo);
                     break;
 
                 case OpponentDifficulty.Harder:
-                    findOpponentOfElo = Random.Range(thisPlayerELO + equivalentRange, thisPlayerELO + equivalentRange + harderRange);
+                    findOpponentOfElo = Random.Range(playerA.ELO + equivalentRange, playerA.ELO + equivalentRange + harderRange);
                     //Debug.Log(findOpponentOfElo);
                     break;
             }
@@ -300,7 +306,6 @@ namespace NS_Rank
         public void WinStreakCounter()
         {
 
-
         }
 
         //Création et initialisation d'un nombre défini de joueurs virtuels
@@ -314,6 +319,7 @@ namespace NS_Rank
 
                 SortPlayerInRankList(playerTmp);
                 GeneratePlayerName(playerTmp);
+                GenerateOnlineStatus(playerTmp);
             }
         }
 

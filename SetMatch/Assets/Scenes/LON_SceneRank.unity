@@ -751,7 +751,7 @@ MonoBehaviour:
   easierRange: 2
   equivalentRange: 2
   harderRange: 2
-  playersInit: 350
+  playersInit: 1500
 --- !u!4 &720596739
 Transform:
   m_ObjectHideFlags: 0
