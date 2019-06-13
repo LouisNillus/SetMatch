@@ -747,11 +747,12 @@ MonoBehaviour:
   finalELOB: 0
   winrateA: {fileID: 1367069359}
   winrateB: {fileID: 1019271533}
-  opponentDifficulty: 0
   easierRange: 2
   equivalentRange: 2
   harderRange: 2
-  playersInit: 1500
+  playersInit: 100
+  searchingProbability: 0.75
+  onlineProbability: 0.5
 --- !u!4 &720596739
 Transform:
   m_ObjectHideFlags: 0

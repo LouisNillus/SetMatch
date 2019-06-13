@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -7,8 +8,12 @@ namespace NS_Rank
 {
     public class Player
     {
+
+        public OpponentDifficulty opponentDifficulty = OpponentDifficulty.Harder;
         public RankNames rankNames;
+
         public bool isOnline;
+        public bool isSearching;
         public string pseudo;
         public string mail;
         public float ELO;
@@ -17,7 +22,7 @@ namespace NS_Rank
 
         public int currentListIndex;
 
-
+        public enum OpponentDifficulty { Easier, Equivalent, Harder }
         public enum RankNames { Amateur, Pro, FifthLeague, FourthLeague, ThirdLeague, SecondLeague, FirstLeague, Master, Legend }
     }
 
@@ -36,6 +41,45 @@ namespace NS_Rank
         public List<Player> rank1 = new List<Player>();
         public List<Player> rankMaster = new List<Player>();
         public List<Player> rankLegend = new List<Player>();
+
+        //Predicates
+        Predicate<Player> perfectMatch = PerfectMatch;
+            
+        public static bool PerfectMatch(Player opponent)
+        {
+            return (opponent.isOnline == true && opponent.isSearching == true);
+        }
+
+        public void InRangeELO(Player playerA, Player opponent, List<Player> listToRemoveFrom)
+        {
+            float under = 0f;
+            float above = 0f;
+
+            if(playerA.opponentDifficulty == Player.OpponentDifficulty.Easier)
+            {
+                above = playerA.ELO - equivalentRange - easierRange;
+                under = playerA.ELO - equivalentRange;
+            }
+            else if(playerA.opponentDifficulty == Player.OpponentDifficulty.Equivalent)
+            {
+                above = playerA.ELO - equivalentRange;
+                under = playerA.ELO + equivalentRange;
+            }
+            else if (playerA.opponentDifficulty == Player.OpponentDifficulty.Harder)
+            {
+                above = playerA.ELO + equivalentRange;
+                under = playerA.ELO + equivalentRange + harderRange;
+            }
+
+            if(opponent.ELO >= above && opponent.ELO <= under)
+            {
+                return;
+            }
+            else if(listToRemoveFrom.Contains(opponent))
+            {
+                listToRemoveFrom.Remove(opponent);
+            }
+        }
 
         //List of rank Lists
         public List<List<Player>> listOfRankList = new List<List<Player>>();
@@ -71,17 +115,21 @@ namespace NS_Rank
         public Text winrateA;
         public Text winrateB;
 
-        [Header("Nouvel Adversaire"), SerializeField]
-        private OpponentDifficulty opponentDifficulty;
-        [Range(0,5)]
+        [Header("Nouvel Adversaire")]
+        [Range(0, 5)]
         public float easierRange;
-        [Range(0,5)]
+        [Range(0, 5)]
         public float equivalentRange;
-        [Range(0,5)]
+        [Range(0, 5)]
         public float harderRange;
 
-        [Header("Simulation"), SerializeField]
+        [Header("Simulation")]
+        [SerializeField]
         int playersInit;
+        [Range(0,1), SerializeField]
+        float searchingProbability;
+        [Range(0,1), SerializeField]
+        float onlineProbability;
 
 
 
@@ -114,7 +162,12 @@ namespace NS_Rank
             myPlayer = listOfRankList[0][0];
             myPlayer.pseudo = "Louis";
             myPlayer.isOnline = true;
+            myPlayer.isSearching = true;
+
+            GetNewOpponentFor(myPlayer);
         }
+
+
 
         // Update
         void Update()
@@ -161,9 +214,8 @@ namespace NS_Rank
                 }
             }
             //////////////////////////////
-            opponent = GetNewOpponentFor(myPlayer);
+            
         }
-
 
         //IL EST IMPORTANT DE NOTER QUE LES POURCENTAGES DE VICTOIRE SONT ICI ARBITRAIRES ET NE REFLETENT PAS FORCEMENT LA REALITE.
         public void Bake(float vA, float vB)
@@ -263,45 +315,52 @@ namespace NS_Rank
             }
             else
             {
-                eloColor.transform.Find("ELOValue").GetComponent<Text>().color = new Color32(50, 50, 50, 255);
+                eloColor.transform.Find("ELOValue").GetComponent<Text>().color = new Color32(50, 50, 50, 255);              
             }
         }
-
+        
         //Autorise le Bake
         public void CanBake()
         {
             canBake = true;
         }
 
+        //Obetnir un adversaire pour le joueur A --> MATCHMAKING
         public Player GetNewOpponentFor(Player playerA)
         {
-            Player opponent;
-            float findOpponentOfElo = 0f;
+            List<Player> opponentsList = new List<Player>();
+            opponentsList.Clear();
+            opponentsList = listOfRankList[playerA.currentListIndex].FindAll(perfectMatch);
 
-            switch (opponentDifficulty)
+            List<Player> opponentsListTMP = new List<Player>();
+            opponentsListTMP.Clear();
+            foreach(Player p in opponentsList)
             {
-                case OpponentDifficulty.Easier:
-                    findOpponentOfElo = Random.Range(playerA.ELO - equivalentRange - easierRange, playerA.ELO - equivalentRange);
-                    //Debug.Log(findOpponentOfElo);
-                    break;
+                opponentsListTMP.Add(p);
+            }
+            foreach (Player oppo in opponentsListTMP)
+            {
+                InRangeELO(playerA, oppo, opponentsList);
+            }
+            Debug.Log(opponentsList.Count);
 
-                case OpponentDifficulty.Equivalent:
-                    findOpponentOfElo = Random.Range(playerA.ELO - equivalentRange, playerA.ELO + equivalentRange);
-                    //Debug.Log(findOpponentOfElo);
-                    break;
-
-                case OpponentDifficulty.Harder:
-                    findOpponentOfElo = Random.Range(playerA.ELO + equivalentRange, playerA.ELO + equivalentRange + harderRange);
-                    //Debug.Log(findOpponentOfElo);
-                    break;
+            if(opponentsList.Count != 0)
+            {
+                opponent = opponentsList[UnityEngine.Random.Range(0, opponentsList.Count)];
             }
 
-            opponent = listOfRankList[1][2];
+            if (opponent != null)
+            {
+                Debug.Log("PSEUDO = " + opponent.pseudo + " IsOnline = " + opponent.isOnline + " IsSearching = " + opponent.isSearching + " ELO = " + opponent.ELO);
+                Debug.Log(playerA.ELO);
+                return opponent;
+            }
+            else
+            {
+                return null;
+            }
 
-            return opponent;
-        }
-
-
+        } //Breakpoint ici
 
         public void WinStreakCounter()
         {
@@ -314,15 +373,17 @@ namespace NS_Rank
             for (int i = 0; i < nbPlayers; i++)
             {
                 Player playerTmp = new Player();
-                playerTmp.ELO = Random.Range(0, 100);
+                playerTmp.ELO = UnityEngine.Random.Range(0, 100);
                 listPlayers.Add(playerTmp);
 
                 SortPlayerInRankList(playerTmp);
                 GeneratePlayerName(playerTmp);
                 GenerateOnlineStatus(playerTmp);
+                GenerateSearchingStatus(playerTmp);
             }
         }
 
+        //Range les joueurs dans les listes en fonction de leur ELO
         public void SortPlayerInRankList(Player player)
         {
             //Si la liste contient le joueur, alors le retire (puisqu'il sera réaffecté par la suite)
@@ -385,12 +446,13 @@ namespace NS_Rank
         //Génère un nom aléatoire au joueur
         public void GeneratePlayerName(Player player)
         {
-            string[] randomLetter = new string[] { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"};
+            string[] randomLetter = new string[] {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
+                                                  "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"};
 
-            string nameCompFirst = randomLetter[Random.Range(0, randomLetter.Length)].ToString();
-            string nameCompSecond = randomLetter[Random.Range(0, randomLetter.Length)].ToString();
-            string nameCompThird = randomLetter[Random.Range(0, randomLetter.Length)].ToString();
-            string nameCompFourth = randomLetter[Random.Range(0, randomLetter.Length)].ToString();
+            string nameCompFirst = randomLetter[UnityEngine.Random.Range(0, randomLetter.Length)].ToString();
+            string nameCompSecond = randomLetter[UnityEngine.Random.Range(0, randomLetter.Length)].ToString();
+            string nameCompThird = randomLetter[UnityEngine.Random.Range(0, randomLetter.Length)].ToString();
+            string nameCompFourth = randomLetter[UnityEngine.Random.Range(0, randomLetter.Length)].ToString();
             //string nameCompFifth = randomLetter[Random.Range(0, randomLetter.Length)].ToString();
 
             //Il y a environ 1 chance sur 4.112.784 d'avoir deux joueurs avec le même nom
@@ -401,7 +463,7 @@ namespace NS_Rank
         //Génère un statut de connexion aléatoire au joueur
         public void GenerateOnlineStatus(Player player)
         {
-            if (Random.value >= 0.5)
+            if (UnityEngine.Random.value <= onlineProbability)
             {
                 player.isOnline = true;
             }
@@ -410,7 +472,19 @@ namespace NS_Rank
                 player.isOnline = false;
             }
         }
+        
+        //Génère un statut de recherche aléatoire au joueur
+        public void GenerateSearchingStatus(Player player)
+        {
+            if (UnityEngine.Random.value <= searchingProbability && player.isOnline == true)
+            {
+                player.isSearching = true;
+            }
+            else
+            {
+                player.isSearching = false;
+            }
+        }
 
     }
-    enum OpponentDifficulty { Easier, Equivalent, Harder }
 }
