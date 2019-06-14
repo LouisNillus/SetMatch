@@ -50,36 +50,7 @@ namespace NS_Rank
             return (opponent.isOnline == true && opponent.isSearching == true);
         }
 
-        public void InRangeELO(Player playerA, Player opponent, List<Player> listToRemoveFrom)
-        {
-            float under = 0f;
-            float above = 0f;
-
-            if(playerA.opponentDifficulty == Player.OpponentDifficulty.Easier)
-            {
-                above = playerA.ELO - equivalentRange - easierRange;
-                under = playerA.ELO - equivalentRange;
-            }
-            else if(playerA.opponentDifficulty == Player.OpponentDifficulty.Equivalent)
-            {
-                above = playerA.ELO - equivalentRange;
-                under = playerA.ELO + equivalentRange;
-            }
-            else if (playerA.opponentDifficulty == Player.OpponentDifficulty.Harder)
-            {
-                above = playerA.ELO + equivalentRange;
-                under = playerA.ELO + equivalentRange + harderRange;
-            }
-
-            if(opponent.ELO >= above && opponent.ELO <= under)
-            {
-                return;
-            }
-            else if(listToRemoveFrom.Contains(opponent))
-            {
-                listToRemoveFrom.Remove(opponent);
-            }
-        }
+        
 
         //List of rank Lists
         public List<List<Player>> listOfRankList = new List<List<Player>>();
@@ -136,12 +107,6 @@ namespace NS_Rank
         // Start
         void Start()
         {
-            // Initialisation pas propre des pourcentages
-            float.TryParse(inputRankA.text, out float valueRankA);
-            float.TryParse(inputRankB.text, out float valueRankB);
-            winrateA.text = Mathf.RoundToInt(1f / (1f + Mathf.Pow(10f, (valueRankB - valueRankA) / scale)) * 100).ToString() + "%";
-            winrateB.text = Mathf.RoundToInt(1f / (1f + Mathf.Pow(10f, (valueRankA - valueRankB) / scale)) * 100).ToString() + "%";
-
             // Initialisation du sorting des rangs
             listOfRankList.Add(rankAmateur);
             listOfRankList.Add(rankPro);
@@ -165,6 +130,10 @@ namespace NS_Rank
             myPlayer.isSearching = true;
 
             GetNewOpponentFor(myPlayer);
+
+            // Initialisation des pourcentages de victoire
+            winrateA.text = WinProbabilityCalcul(myPlayer, opponent).ToString() + "%";
+            winrateB.text = (1f - WinProbabilityCalcul(myPlayer, opponent)).ToString() + "%";
         }
 
 
@@ -172,6 +141,13 @@ namespace NS_Rank
         // Update
         void Update()
         {
+            //canBake = true; //Breakpoint pour faire 
+
+            if(Input.GetKeyDown(KeyCode.A))
+            {
+                MatchSimulation(myPlayer, opponent);
+            }
+
             // Si winA est activé, alors affiche Winner à l'écran (et inversement)
             if (winA.isOn == true)
             {
@@ -181,12 +157,19 @@ namespace NS_Rank
             {
                 winA.GetComponentInChildren<Text>().text = "Loser";
             }
-
-            Ranking();
+            
+            Ranking(myPlayer, opponent);
         }
 
-        public void Ranking()
+        public void Ranking(Player playerA, Player opponent)
         {
+
+            if(playerA != null && opponent != null)
+            {
+                inputRankA.text = playerA.ELO.ToString();
+                inputRankB.text = opponent.ELO.ToString();
+            }
+
             //Affiche l'ELO de chaque joueur à l'écran
             if (float.TryParse(inputRankA.text, out float valueRankA) && float.TryParse(inputRankB.text, out float valueRankB))
             {
@@ -209,7 +192,7 @@ namespace NS_Rank
                 //Si on appuie sur le bouton Bake, cette fonction est lancée
                 if (canBake == true)
                 {
-                    Bake(valueRankA, valueRankB);
+                    Bake(valueRankA, valueRankB, myPlayer, opponent);
                     canBake = false;
                 }
             }
@@ -218,7 +201,7 @@ namespace NS_Rank
         }
 
         //IL EST IMPORTANT DE NOTER QUE LES POURCENTAGES DE VICTOIRE SONT ICI ARBITRAIRES ET NE REFLETENT PAS FORCEMENT LA REALITE.
-        public void Bake(float vA, float vB)
+        public void Bake(float vA, float vB, Player playerA, Player opponent)
         {
             int aWin = 0;
             int bWin = 0;
@@ -236,16 +219,16 @@ namespace NS_Rank
                     bWin = 1;
                     break;
             }
-            
+
             //Met à jour l'ELO avec le calcul officiel puis l'affiche à l'écran
-            finalELOA = vA + k * (aWin - (1f / (1f + Mathf.Pow(10f, (vB - vA) / scale))));
-            finalELOB = vB + k * (bWin - (1f / (1f + Mathf.Pow(10f, (vA - vB) / scale))));
-            finalELOA = Mathf.Round(finalELOA * 10) / 10;
-            finalELOB = Mathf.Round(finalELOB * 10) / 10;
-            inputRankA.text = finalELOA.ToString();
-            inputRankB.text = finalELOB.ToString();
-            SetRankNames(finalELOA, rankNameA, inputRankA);
-            SetRankNames(finalELOB, rankNameB, inputRankB);
+            playerA.ELO = vA + k * (aWin - (1f / (1f + Mathf.Pow(10f, (vB - vA) / scale))));
+            opponent.ELO = vB + k * (bWin - (1f / (1f + Mathf.Pow(10f, (vA - vB) / scale))));
+            playerA.ELO = Mathf.Round(playerA.ELO * 10) / 10;
+            opponent.ELO = Mathf.Round(opponent.ELO * 10) / 10;
+            inputRankA.text = playerA.ELO.ToString();
+            inputRankB.text = opponent.ELO.ToString();
+            SetRankNames(playerA.ELO, rankNameA, inputRankA);
+            SetRankNames(opponent.ELO, rankNameB, inputRankB);
         }
 
         //Affiche le nom des rangs ainsi que leur couleur en fonction de l'ELO
@@ -334,6 +317,7 @@ namespace NS_Rank
 
             List<Player> opponentsListTMP = new List<Player>();
             opponentsListTMP.Clear();
+
             foreach(Player p in opponentsList)
             {
                 opponentsListTMP.Add(p);
@@ -342,7 +326,7 @@ namespace NS_Rank
             {
                 InRangeELO(playerA, oppo, opponentsList);
             }
-            Debug.Log(opponentsList.Count);
+            Debug.Log("Il y a " + opponentsList.Count + " adversaires potentiels");
 
             if(opponentsList.Count != 0)
             {
@@ -351,8 +335,8 @@ namespace NS_Rank
 
             if (opponent != null)
             {
-                Debug.Log("PSEUDO = " + opponent.pseudo + " IsOnline = " + opponent.isOnline + " IsSearching = " + opponent.isSearching + " ELO = " + opponent.ELO);
-                Debug.Log(playerA.ELO);
+                Debug.Log("Pseudo = " + opponent.pseudo + " IsOnline = " + opponent.isOnline + " IsSearching = " + opponent.isSearching + " ELO = " + opponent.ELO);
+                Debug.Log("Pseudo = " + playerA.pseudo + " ELO = " + playerA.ELO);
                 return opponent;
             }
             else
@@ -367,6 +351,35 @@ namespace NS_Rank
 
         }
 
+        //Match simulation
+        public void MatchSimulation(Player playerA, Player opponent)
+        {
+            float winProbabilityA = WinProbabilityCalcul(playerA, opponent);
+
+            float myRandom = UnityEngine.Random.Range(0.0f, 1.0f);
+            myRandom = Mathf.Round(myRandom * 100) / 100;
+
+            if(myRandom < winProbabilityA)
+            {
+                winA.isOn = true;
+            }
+            else if(myRandom >= winProbabilityA)
+            {
+                winA.isOn = false;
+            }
+
+            Debug.Log(winProbabilityA + "   " + myRandom);
+        }
+
+        //Fonction de calcul de la probabilité de victoire de A (renvoie un float)
+        public float WinProbabilityCalcul (Player playerA, Player opponent)
+        {
+            float winProb = 1f / (1f + Mathf.Pow(10f, (opponent.ELO - playerA.ELO) / scale));
+            winProb= Mathf.Round(winProb * 100) / 100;
+
+            return winProb;
+        }      
+
         //Création et initialisation d'un nombre défini de joueurs virtuels
         public void createPlayers(int nbPlayers)
         {
@@ -374,6 +387,7 @@ namespace NS_Rank
             {
                 Player playerTmp = new Player();
                 playerTmp.ELO = UnityEngine.Random.Range(0, 100);
+                playerTmp.ELO = Mathf.Round(playerTmp.ELO * 10) / 10;
                 listPlayers.Add(playerTmp);
 
                 SortPlayerInRankList(playerTmp);
@@ -486,5 +500,36 @@ namespace NS_Rank
             }
         }
 
+        //Fonction de choix d'un adversaire plus facile, équivalent ou plus difficile dans une liste d'adversaires proposée
+        public void InRangeELO(Player playerA, Player opponent, List<Player> listToRemoveFrom)
+        {
+            float under = 0f;
+            float above = 0f;
+
+            if (playerA.opponentDifficulty == Player.OpponentDifficulty.Easier)
+            {
+                above = playerA.ELO - equivalentRange - easierRange;
+                under = playerA.ELO - equivalentRange;
+            }
+            else if (playerA.opponentDifficulty == Player.OpponentDifficulty.Equivalent)
+            {
+                above = playerA.ELO - equivalentRange;
+                under = playerA.ELO + equivalentRange;
+            }
+            else if (playerA.opponentDifficulty == Player.OpponentDifficulty.Harder)
+            {
+                above = playerA.ELO + equivalentRange;
+                under = playerA.ELO + equivalentRange + harderRange;
+            }
+
+            if (opponent.ELO >= above && opponent.ELO <= under)
+            {
+                return;
+            }
+            else if (listToRemoveFrom.Contains(opponent))
+            {
+                listToRemoveFrom.Remove(opponent);
+            }
+        }
     }
 }

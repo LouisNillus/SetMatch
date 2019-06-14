@@ -741,7 +741,7 @@ MonoBehaviour:
   - {r: 0.5181584, g: 0, b: 0.8, a: 1}
   - {r: 0.8, g: 0.064860515, b: 0, a: 1}
   - {r: 0, g: 0, b: 0, a: 1}
-  k: 1.7
+  k: 2
   scale: 21
   finalELOA: 0
   finalELOB: 0
@@ -750,7 +750,7 @@ MonoBehaviour:
   easierRange: 2
   equivalentRange: 2
   harderRange: 2
-  playersInit: 100
+  playersInit: 1500
   searchingProbability: 0.75
   onlineProbability: 0.5
 --- !u!4 &720596739
