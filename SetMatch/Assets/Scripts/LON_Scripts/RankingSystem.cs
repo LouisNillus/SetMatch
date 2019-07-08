@@ -6,10 +6,29 @@ using UnityEngine.UI;
 
 namespace NS_Rank
 {
-    public class Player
-    {
 
-        public OpponentDifficulty opponentDifficulty = OpponentDifficulty.Harder;
+    /*
+     * Pour la classe Player:
+     * 
+        ID Unique
+        Liste de Scriptable Objects pour stickers (obtention via events)
+        Liste de Scriptable Objects pour les events (au moins un match pour avoir le badge)
+
+        Pour le Ranking_System :
+        Choix de l'adversaire
+
+        UI Menu :
+        Décomposition des menus sur un doc (plein de propositions)
+
+
+
+
+    */
+    
+
+    public class Player
+    {       
+        public OpponentDifficulty opponentDifficulty = OpponentDifficulty.Easier;
         public RankNames rankNames;
 
         public bool isOnline;
@@ -24,12 +43,17 @@ namespace NS_Rank
 
         public enum OpponentDifficulty { Easier, Equivalent, Harder }
         public enum RankNames { Amateur, Pro, FifthLeague, FourthLeague, ThirdLeague, SecondLeague, FirstLeague, Master, Legend }
+
+
     }
 
     public class RankingSystem : MonoBehaviour
-    {      
+    {
+        public WindowGraph wg;
+
         //List of all players
         public List<Player> listPlayers = new List<Player>();
+        
 
         //Lists by rank
         public List<Player> rankAmateur = new List<Player>();
@@ -48,9 +72,9 @@ namespace NS_Rank
         public static bool PerfectMatch(Player opponent)
         {
             return (opponent.isOnline == true && opponent.isSearching == true);
-        }
+        }       
 
-        
+
 
         //List of rank Lists
         public List<List<Player>> listOfRankList = new List<List<Player>>();
@@ -101,8 +125,13 @@ namespace NS_Rank
         float searchingProbability;
         [Range(0,1), SerializeField]
         float onlineProbability;
+        [Range(0,10), SerializeField]
+        float timeBetweenGames;
+        [Range(0,1000), SerializeField]
+        int numberOfGames;
+        int numberReached = 0;
 
-
+        public List<float> historyELO = new List<float>();
 
         // Start
         void Start()
@@ -119,9 +148,7 @@ namespace NS_Rank
             listOfRankList.Add(rankLegend);
 
             //Ajout des joueurs virtuels et affichage du temps d'exécution
-            Debug.Log("A: " + Time.time);
             createPlayers(playersInit);
-            Debug.Log("B: " + Time.time);
 
             //Initialisation du joueur A
             myPlayer = listOfRankList[0][0];
@@ -131,22 +158,31 @@ namespace NS_Rank
 
             GetNewOpponentFor(myPlayer);
 
+            InvokeRepeating("PlayXGames", 0f, timeBetweenGames);
+
             // Initialisation des pourcentages de victoire
             winrateA.text = WinProbabilityCalcul(myPlayer, opponent).ToString() + "%";
             winrateB.text = (1f - WinProbabilityCalcul(myPlayer, opponent)).ToString() + "%";
         }
 
-
+        public void PlayXGames()
+        {
+            if(numberReached < numberOfGames)
+            {
+                CanBake();
+                wg.UpdateGraph();
+                numberReached++;
+            }
+            else
+            {
+                CancelInvoke();
+            }
+        }
 
         // Update
         void Update()
         {
             //canBake = true; //Breakpoint pour faire 
-
-            if(Input.GetKeyDown(KeyCode.A))
-            {
-                MatchSimulation(myPlayer, opponent);
-            }
 
             // Si winA est activé, alors affiche Winner à l'écran (et inversement)
             if (winA.isOn == true)
@@ -157,18 +193,31 @@ namespace NS_Rank
             {
                 winA.GetComponentInChildren<Text>().text = "Loser";
             }
-            
-            Ranking(myPlayer, opponent);
+
+            if (myPlayer != null && opponent != null)
+            {
+                Ranking(myPlayer, opponent);
+            }
         }
+
+        //Autorise le Bake
+        public void CanBake()
+        {
+            if (canBake != true)
+            {
+                canBake = true;
+            }
+            else
+            {
+                return;
+            }
+        }
+
 
         public void Ranking(Player playerA, Player opponent)
         {
-
-            if(playerA != null && opponent != null)
-            {
                 inputRankA.text = playerA.ELO.ToString();
-                inputRankB.text = opponent.ELO.ToString();
-            }
+                inputRankB.text = opponent.ELO.ToString();       
 
             //Affiche l'ELO de chaque joueur à l'écran
             if (float.TryParse(inputRankA.text, out float valueRankA) && float.TryParse(inputRankB.text, out float valueRankB))
@@ -206,6 +255,8 @@ namespace NS_Rank
             int aWin = 0;
             int bWin = 0;
 
+            SimulateMatch();
+
             // Change la variable de victoire en fonction de si winA est activé ou non
             switch (winA.isOn)
             {
@@ -220,15 +271,22 @@ namespace NS_Rank
                     break;
             }
 
+            GetNewOpponentFor(myPlayer);
+
+
             //Met à jour l'ELO avec le calcul officiel puis l'affiche à l'écran
             playerA.ELO = vA + k * (aWin - (1f / (1f + Mathf.Pow(10f, (vB - vA) / scale))));
             opponent.ELO = vB + k * (bWin - (1f / (1f + Mathf.Pow(10f, (vA - vB) / scale))));
             playerA.ELO = Mathf.Round(playerA.ELO * 10) / 10;
             opponent.ELO = Mathf.Round(opponent.ELO * 10) / 10;
+
+
             inputRankA.text = playerA.ELO.ToString();
             inputRankB.text = opponent.ELO.ToString();
             SetRankNames(playerA.ELO, rankNameA, inputRankA);
             SetRankNames(opponent.ELO, rankNameB, inputRankB);
+
+            historyELO.Add(playerA.ELO);
         }
 
         //Affiche le nom des rangs ainsi que leur couleur en fonction de l'ELO
@@ -302,19 +360,34 @@ namespace NS_Rank
             }
         }
         
-        //Autorise le Bake
-        public void CanBake()
-        {
-            canBake = true;
-        }
-
         //Obetnir un adversaire pour le joueur A --> MATCHMAKING
         public Player GetNewOpponentFor(Player playerA)
         {
             List<Player> opponentsList = new List<Player>();
             opponentsList.Clear();
-            opponentsList = listOfRankList[playerA.currentListIndex].FindAll(perfectMatch);
-
+            
+            //Ajoute les adversaires du rang en dessous
+            if(playerA.currentListIndex -1 >= 0)
+            {
+                foreach(Player p in listOfRankList[playerA.currentListIndex - 1].FindAll(perfectMatch))
+                {
+                    opponentsList.Add(p);
+                }
+            }
+            //Ajoute les adversaires du rang du joueur
+                foreach (Player p in listOfRankList[playerA.currentListIndex].FindAll(perfectMatch))
+                    {
+                        opponentsList.Add(p);
+                    }
+            //Ajoute les adversaires du rang au dessus
+            if (playerA.currentListIndex +1 <= 8)
+            {
+                foreach (Player p in listOfRankList[playerA.currentListIndex + 1].FindAll(perfectMatch))
+                {
+                    opponentsList.Add(p);
+                }
+            }
+            
             List<Player> opponentsListTMP = new List<Player>();
             opponentsListTMP.Clear();
 
@@ -326,6 +399,7 @@ namespace NS_Rank
             {
                 InRangeELO(playerA, oppo, opponentsList);
             }
+
             Debug.Log("Il y a " + opponentsList.Count + " adversaires potentiels");
 
             if(opponentsList.Count != 0)
@@ -335,8 +409,8 @@ namespace NS_Rank
 
             if (opponent != null)
             {
-                Debug.Log("Pseudo = " + opponent.pseudo + " IsOnline = " + opponent.isOnline + " IsSearching = " + opponent.isSearching + " ELO = " + opponent.ELO);
-                Debug.Log("Pseudo = " + playerA.pseudo + " ELO = " + playerA.ELO);
+                // Debug.Log("Pseudo = " + opponent.pseudo + " IsOnline = " + opponent.isOnline + " IsSearching = " + opponent.isSearching + " ELO = " + opponent.ELO);
+                // Debug.Log("Pseudo = " + playerA.pseudo + " ELO = " + playerA.ELO);
                 return opponent;
             }
             else
@@ -346,7 +420,12 @@ namespace NS_Rank
 
         } //Breakpoint ici
 
-        public void WinStreakCounter()
+        public void WinStreakCounter(Player upWinChainOfPlayer)
+        {
+            
+        }
+
+        public void LoseStreakCounter(Player upLoseChainOfPlayer)
         {
 
         }
@@ -368,7 +447,7 @@ namespace NS_Rank
                 winA.isOn = false;
             }
 
-            Debug.Log(winProbabilityA + "   " + myRandom);
+            // Debug.Log(winProbabilityA + "   " + myRandom);
         }
 
         //Fonction de calcul de la probabilité de victoire de A (renvoie un float)
@@ -530,6 +609,12 @@ namespace NS_Rank
             {
                 listToRemoveFrom.Remove(opponent);
             }
+        }
+
+        //Simuler un match
+        public void SimulateMatch()
+        {
+            MatchSimulation(myPlayer, opponent);           
         }
     }
 }
