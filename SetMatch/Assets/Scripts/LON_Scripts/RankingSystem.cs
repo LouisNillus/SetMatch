@@ -71,7 +71,7 @@ namespace NS_Rank
             
         public static bool PerfectMatch(Player opponent)
         {
-            return (opponent.isOnline == true && opponent.isSearching == true);
+            return (opponent.isOnline == true && opponent.isSearching == true);           
         }       
 
 
